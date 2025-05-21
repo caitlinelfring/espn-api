@@ -2,7 +2,7 @@ import datetime
 import time
 import json
 import math
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 from ..base_league import BaseLeague
 from .team import Team
@@ -46,7 +46,8 @@ class League(BaseLeague):
 
     def _fetch_teams(self, data):
         '''Fetch teams in league'''
-        super()._fetch_teams(data, TeamClass=Team)
+        self.pro_schedule = self._get_all_pro_schedule()
+        super()._fetch_teams(data, TeamClass=Team, pro_schedule=self.pro_schedule)
 
         # replace opponentIds in schedule with team instances
         for team in self.teams:
@@ -174,3 +175,25 @@ class League(BaseLeague):
                 elif matchup.away_team == team.team_id:
                     matchup.away_team = team
         return box_data
+
+    def player_info(self, name: str = None, playerId: Union[int, list] = None, include_news = False) -> Union[Player, List[Player]]:
+        ''' Returns Player class if name found '''
+
+        if name:
+            playerId = self.player_map.get(name)
+        if playerId is None or isinstance(playerId, str):
+            return None
+        if not isinstance(playerId, list):
+            playerId = [playerId]
+
+        data = self.espn_request.get_player_card(playerId, self.finalScoringPeriod)
+
+        if include_news:
+            news = {}
+            for id in playerId:
+                news[id] = self.espn_request.get_player_news(id)
+
+        if len(data['players']) == 1:
+            return Player(data['players'][0], self.year, self.pro_schedule, news=news.get(playerId[0], []) if include_news else None)
+        if len(data['players']) > 1:
+            return [Player(player, self.year, self.pro_schedule, news=news.get(player['id'], []) if include_news else None) for player in data['players']]

@@ -1,9 +1,10 @@
 from .constant import POSITION_MAP, PRO_TEAM_MAP, STATS_MAP, STAT_ID_MAP
 from espn_api.utils.utils import json_parsing
+from datetime import datetime
 
 class Player(object):
     '''Player are part of team'''
-    def __init__(self, data, year):
+    def __init__(self, data, year, pro_team_schedule = None, news = None):
         self.name = json_parsing(data, 'fullName')
         self.playerId = json_parsing(data, 'id')
         self.position = POSITION_MAP[json_parsing(data, 'defaultPositionId')]
@@ -13,6 +14,30 @@ class Player(object):
         self.proTeam = PRO_TEAM_MAP[json_parsing(data, 'proTeamId')]
         self.injuryStatus = json_parsing(data, 'injuryStatus')
         self.stats = {}
+        self.schedule = {}
+        self.news = {}
+        expected_return_date = json_parsing(data, 'expectedReturnDate')
+        self.expected_return_date = datetime(*expected_return_date).date() if expected_return_date else None
+
+        if pro_team_schedule:
+            pro_team_id = json_parsing(data, 'proTeamId')
+            pro_team = pro_team_schedule.get(pro_team_id, {})
+            for key in pro_team:
+                game = pro_team[key][0]
+                team = game['awayProTeamId'] if game['awayProTeamId'] != pro_team_id else game['homeProTeamId']
+                self.schedule[key] = { 'team': PRO_TEAM_MAP[team], 'date': datetime.fromtimestamp(game['date']/1000.0) }
+
+        if news:
+            news_feed = news.get("news", {}).get("feed", [])
+            self.news = [
+                {
+                    "published": item.get("published", ""),
+                    "headline": item.get("headline", ""),
+                    "story": item.get("story", "")
+                }
+                for item in news_feed
+            ]
+
 
         # add available stats
 
